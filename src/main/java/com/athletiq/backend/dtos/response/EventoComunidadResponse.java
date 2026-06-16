@@ -16,5 +16,7 @@ public class EventoComunidadResponse {
     private String avatarUrl;
     private TipoEvento tipoEvento;
     private UUID referenciaId;
+    private String referenciaNombre;
+    private Integer nivelUsuario;
     private LocalDateTime fechaCreacion;
 }

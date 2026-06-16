@@ -6,6 +6,8 @@ import com.athletiq.backend.models.entities.Usuario;
 import com.athletiq.backend.models.enums.TipoEvento;
 import com.athletiq.backend.repositories.EventoComunidadRepository;
 import com.athletiq.backend.repositories.UsuarioRepository;
+import com.athletiq.backend.repositories.HabilidadRepository;
+import com.athletiq.backend.repositories.LigaRepository;
 import com.athletiq.backend.services.EventoComunidadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +32,8 @@ public class EventoComunidadServiceImpl implements EventoComunidadService {
 
     private final EventoComunidadRepository eventoComunidadRepository;
     private final UsuarioRepository usuarioRepository;
+    private final HabilidadRepository HabilidadRepository;
+    private final LigaRepository ligaRepository;
 
     @Async
     @Override
@@ -88,6 +92,19 @@ public class EventoComunidadServiceImpl implements EventoComunidadService {
     }
 
     private EventoComunidadResponse toResponse(EventoComunidad evento) {
+        String referenciaNombre = "";
+        if (evento.getTipoEvento() == TipoEvento.HABILIDAD_COMPLETADA && evento.getReferenciaId() != null) {
+            referenciaNombre = HabilidadRepository.findById(evento.getReferenciaId())
+                    .map(h -> h.getNombre())
+                    .orElse("Habilidad");
+        } else if (evento.getTipoEvento() == TipoEvento.LIGA_ASCENSO && evento.getReferenciaId() != null) {
+            referenciaNombre = ligaRepository.findById(evento.getReferenciaId())
+                    .map(l -> l.getNombre())
+                    .orElse("Liga");
+        } else if (evento.getTipoEvento() == TipoEvento.NIVEL_ALCANZADO) {
+            referenciaNombre = String.valueOf(evento.getUsuario().getNivel());
+        }
+
         return EventoComunidadResponse.builder()
                 .id(evento.getId())
                 .idUsuario(evento.getUsuario().getId())
@@ -95,6 +112,8 @@ public class EventoComunidadServiceImpl implements EventoComunidadService {
                 .avatarUrl(evento.getUsuario().getAvatarUrl())
                 .tipoEvento(evento.getTipoEvento())
                 .referenciaId(evento.getReferenciaId())
+                .referenciaNombre(referenciaNombre)
+                .nivelUsuario(evento.getUsuario().getNivel())
                 .fechaCreacion(evento.getFechaCreacion())
                 .build();
     }

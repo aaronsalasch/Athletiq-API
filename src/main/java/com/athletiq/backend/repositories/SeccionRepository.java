@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface SeccionRepository extends JpaRepository<Seccion, UUID> {
     List<Seccion> findByActividadIdOrderByOrden(UUID actividadId);
+    
+    long countByActividadId(UUID actividadId);
 }

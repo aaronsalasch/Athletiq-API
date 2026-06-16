@@ -69,6 +69,7 @@ CREATE DATABASE athletiq_db;
 CREATE USER athletiq_user WITH PASSWORD 'root';
 GRANT ALL PRIVILEGES ON DATABASE athletiq_db TO athletiq_user;
 GRANT ALL PRIVILEGES ON SCHEMA public TO athletiq_user;
+ALTER DATABASE athletiq_db OWNER TO athletiq_user;
 ```
 
 ### 2. Configurar las propiedades
@@ -341,7 +342,7 @@ GET     /api/comunidad/eventos
 | `GET`  | `/api/actividades/{id}/secciones` | Secciones ordenadas            |
 | `GET`  | `/api/secciones/{id}/habilidades` | Habilidades con conteo         |
 | `GET`  | `/api/habilidades/{id}`           | Habilidad + ejercicios + pasos |
-
+x  
 ### Progreso de usuario (requiere JWT)
 
 | Método |             Ruta                 |            Body             |                   Descripción                     |

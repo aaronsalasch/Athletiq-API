@@ -11,6 +11,8 @@ import java.util.UUID;
 @Builder
 public class HabilidadDetalleResponse {
     private UUID id;
+    private UUID seccionId;
+    private UUID actividadId;
     private Integer orden;
     private String nombre;
     private String descripcion;

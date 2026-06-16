@@ -1,6 +1,8 @@
 package com.athletiq.backend.services.impl;
 
+import com.athletiq.backend.dtos.response.ProgresoActividadResponse;
 import com.athletiq.backend.dtos.response.ProgresoHabilidadResponse;
+import com.athletiq.backend.dtos.response.ProgresoResponse;
 import com.athletiq.backend.exceptions.ResourceNotFoundException;
 import com.athletiq.backend.models.entities.*;
 import com.athletiq.backend.models.keys.ProgresoEjercicioKey;
@@ -41,15 +43,16 @@ public class ProgresoServiceImpl implements ProgresoService {
     private final UsuarioRepository usuarioRepository;
     private final HabilidadRepository habilidadRepository;
     private final EjercicioRepository ejercicioRepository;
+    private final ActividadRepository actividadRepository;
+    private final SeccionRepository seccionRepository;
     private final GamificacionService gamificacionService;
 
     @Override
-    public void completarEjercicio(UUID usuarioId, UUID habilidadId, UUID ejercicioId) {
+    public ProgresoResponse completarEjercicio(UUID usuarioId, UUID habilidadId, UUID ejercicioId) {
         ProgresoEjercicioKey key = new ProgresoEjercicioKey(usuarioId, habilidadId, ejercicioId);
 
         ProgresoEjercicio progreso = progresoEjercicioRepository.findById(key)
                 .orElseGet(() -> {
-                    // Crear registro de progreso si no existe
                     Usuario usuario   = usuarioRepository.getReferenceById(usuarioId);
                     Habilidad hab     = habilidadRepository.getReferenceById(habilidadId);
                     Ejercicio ejerc   = ejercicioRepository.getReferenceById(ejercicioId);
@@ -62,21 +65,78 @@ public class ProgresoServiceImpl implements ProgresoService {
                 });
 
         if (progreso.getCompletado()) {
-            return; // idempotente: no reprocesar si ya estaba completado
+            return ProgresoResponse.builder().success(false).build();
         }
 
         progreso.setCompletado(true);
         progreso.setFechaCompletado(LocalDateTime.now());
         progresoEjercicioRepository.save(progreso);
 
-        // Asegurar que exista el ProgresoHabilidad raíz
         inicializarProgresoHabilidadSiNecesario(usuarioId, habilidadId);
-
-        // Motor de Rachas
         procesarRacha(usuarioId);
 
-        // Motor de Gamificación — verifica si completó la habilidad completa
-        gamificacionService.procesarCompletitudHabilidad(usuarioId, habilidadId);
+        Usuario usuario = usuarioRepository.findById(usuarioId).orElseThrow();
+        int nivelInicial = usuario.getNivel();
+        int xpGanadaTotal = 0;
+
+        HabilidadEjercicio he = habilidadEjercicioRepository.findById(new com.athletiq.backend.models.keys.HabilidadEjercicioKey(habilidadId, ejercicioId))
+                .orElseThrow();
+        xpGanadaTotal += he.getXpOtorgada();
+
+        boolean habilidadCompletada = false;
+        boolean seccionCompletada = false;
+        boolean actividadCompletada = false;
+
+        long totalEjercicios = habilidadEjercicioRepository.countByHabilidadId(habilidadId);
+        long completados = progresoEjercicioRepository.countByIdIdUsuarioAndIdIdHabilidadAndCompletadoTrue(usuarioId, habilidadId);
+
+        if (totalEjercicios > 0 && totalEjercicios == completados) {
+            ProgresoHabilidad ph = progresoHabilidadRepository.findById(new ProgresoHabilidadKey(usuarioId, habilidadId)).orElseThrow();
+            if (!ph.getCompletado()) {
+                ph.setCompletado(true);
+                ph.setFechaCompletado(LocalDateTime.now());
+                progresoHabilidadRepository.save(ph);
+                
+                habilidadCompletada = true;
+                xpGanadaTotal += (totalEjercicios * 50);
+
+                UUID seccionId = ph.getHabilidad().getSeccion().getId();
+                long totalHabilidades = habilidadRepository.countBySeccionId(seccionId);
+                long habilidadesCompletadas = progresoHabilidadRepository.countCompletedByUsuarioAndSeccionId(usuarioId, seccionId);
+
+                if (totalHabilidades > 0 && totalHabilidades == habilidadesCompletadas) {
+                    seccionCompletada = true;
+                    xpGanadaTotal += (totalHabilidades * 100);
+
+                    UUID actividadId = ph.getHabilidad().getSeccion().getActividad().getId();
+                    long totalHabAct = habilidadRepository.countByActividadId(actividadId);
+                    long compHabAct = progresoHabilidadRepository.countCompletedByUsuarioAndActividadId(usuarioId, actividadId);
+
+                    if (totalHabAct > 0 && totalHabAct == compHabAct) {
+                        actividadCompletada = true;
+                        long totalSecciones = seccionRepository.countByActividadId(actividadId);
+                        xpGanadaTotal += (totalSecciones * 200);
+                    }
+                }
+            }
+        }
+
+        gamificacionService.sumarXpAlUsuario(usuarioId, xpGanadaTotal, habilidadId);
+        
+        Usuario usuarioActualizado = usuarioRepository.findById(usuarioId).orElseThrow();
+        boolean subioDeNivel = usuarioActualizado.getNivel() > nivelInicial;
+
+        return ProgresoResponse.builder()
+                .success(true)
+                .habilidadCompletada(habilidadCompletada)
+                .seccionCompletada(seccionCompletada)
+                .actividadCompletada(actividadCompletada)
+                .xpGanada(xpGanadaTotal)
+                .subioDeNivel(subioDeNivel)
+                .nuevaRacha(usuarioActualizado.getRachaActual())
+                .nuevoNivel(usuarioActualizado.getNivel())
+                .nuevoXp(usuarioActualizado.getPuntosXp())
+                .build();
     }
 
     // ── Motor de Rachas ───────────────────────────────────────────────────────
@@ -133,6 +193,26 @@ public class ProgresoServiceImpl implements ProgresoService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ProgresoActividadResponse> getProgresoActividades(UUID usuarioId) {
+        return actividadRepository.findAll().stream().map(actividad -> {
+            long totalEjercicios = habilidadEjercicioRepository.countByActividadId(actividad.getId());
+            long completados = progresoEjercicioRepository.countCompletedByUsuarioAndActividadId(usuarioId, actividad.getId());
+            
+            int porcentaje = 0;
+            if (totalEjercicios > 0) {
+                porcentaje = (int) Math.round(((double) completados / totalEjercicios) * 100);
+            }
+            
+            return ProgresoActividadResponse.builder()
+                    .idActividad(actividad.getId())
+                    .nombreActividad(actividad.getNombre())
+                    .progresoPorcentaje(porcentaje)
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ProgresoHabilidadResponse getProgresoHabilidad(UUID usuarioId, UUID habilidadId) {
         ProgresoHabilidadKey key = new ProgresoHabilidadKey(usuarioId, habilidadId);
         ProgresoHabilidad ph = progresoHabilidadRepository.findById(key)
@@ -148,6 +228,7 @@ public class ProgresoServiceImpl implements ProgresoService {
 
         return ProgresoHabilidadResponse.builder()
                 .idHabilidad(habilidadId)
+                .idSeccion(ph.getHabilidad().getSeccion().getId())
                 .nombreHabilidad(ph.getHabilidad().getNombre())
                 .completado(ph.getCompletado())
                 .fechaCompletado(ph.getFechaCompletado())

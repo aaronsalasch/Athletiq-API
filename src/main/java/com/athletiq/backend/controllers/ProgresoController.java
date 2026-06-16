@@ -1,7 +1,9 @@
 package com.athletiq.backend.controllers;
 
 import com.athletiq.backend.dtos.request.CompletarEjercicioRequest;
+import com.athletiq.backend.dtos.response.ProgresoActividadResponse;
 import com.athletiq.backend.dtos.response.ProgresoHabilidadResponse;
+import com.athletiq.backend.dtos.response.ProgresoResponse;
 import com.athletiq.backend.security.SecurityUtils;
 import com.athletiq.backend.services.ProgresoService;
 import jakarta.validation.Valid;
@@ -32,10 +34,20 @@ public class ProgresoController {
      * Body: { "habilidadId": "...", "ejercicioId": "..." }
      */
     @PostMapping("/completar")
-    public ResponseEntity<Void> completarEjercicio(@Valid @RequestBody CompletarEjercicioRequest request) {
+    public ResponseEntity<ProgresoResponse> completarEjercicio(@Valid @RequestBody CompletarEjercicioRequest request) {
         UUID usuarioId = securityUtils.getCurrentUserId();
-        progresoService.completarEjercicio(usuarioId, request.getHabilidadId(), request.getEjercicioId());
-        return ResponseEntity.noContent().build();
+        ProgresoResponse response = progresoService.completarEjercicio(usuarioId, request.getHabilidadId(), request.getEjercicioId());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/progreso/actividades
+     * Lista el progreso general de las actividades.
+     */
+    @GetMapping("/actividades")
+    public ResponseEntity<List<ProgresoActividadResponse>> getProgresoActividades() {
+        UUID usuarioId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(progresoService.getProgresoActividades(usuarioId));
     }
 
     /**

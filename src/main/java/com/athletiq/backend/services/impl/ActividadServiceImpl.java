@@ -93,6 +93,8 @@ public class ActividadServiceImpl implements ActividadService {
 
         return HabilidadDetalleResponse.builder()
                 .id(habilidad.getId())
+                .seccionId(habilidad.getSeccion().getId())
+                .actividadId(habilidad.getSeccion().getActividad().getId())
                 .orden(habilidad.getOrden())
                 .nombre(habilidad.getNombre())
                 .descripcion(habilidad.getDescripcion())

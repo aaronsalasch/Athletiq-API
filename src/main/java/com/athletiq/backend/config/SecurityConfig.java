@@ -51,6 +51,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/actividades").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/secciones/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/habilidades/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/clasificacion/ligas").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/clasificacion/ligas/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/clasificacion").permitAll()
                 // Autenticación abierta
                 .requestMatchers("/api/auth/**").permitAll()
                 // Todo lo demás requiere token

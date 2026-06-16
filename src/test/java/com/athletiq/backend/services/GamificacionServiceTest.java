@@ -4,6 +4,8 @@ import com.athletiq.backend.models.entities.*;
 import com.athletiq.backend.models.enums.Dificultad;
 import com.athletiq.backend.models.keys.ClasificacionUsuarioKey;
 import com.athletiq.backend.models.keys.HabilidadEjercicioKey;
+import com.athletiq.backend.models.keys.ProgresoEjercicioKey;
+import com.athletiq.backend.models.keys.ProgresoHabilidadKey;
 import com.athletiq.backend.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +37,8 @@ class GamificacionServiceTest {
     @Autowired ClasificacionUsuarioRepository clasificacionUsuarioRepository;
     @Autowired LigaRepository ligaRepository;
     @Autowired TemporadaRepository temporadaRepository;
+    @Autowired ProgresoHabilidadRepository progresoHabilidadRepository;
+    @Autowired ProgresoEjercicioRepository progresoEjercicioRepository;
 
     private Usuario usuario;
 
@@ -133,9 +137,25 @@ class GamificacionServiceTest {
                 .id(new HabilidadEjercicioKey(hab.getId(), ej.getId()))
                 .habilidad(hab).ejercicio(ej).orden(1).xpOtorgada(30).build());
 
-        // Primera llamada — completa la habilidad
+        // Inicializar progreso raíz e indicar que el ejercicio de la habilidad está completado
+        progresoHabilidadRepository.save(ProgresoHabilidad.builder()
+                .id(new ProgresoHabilidadKey(usuario.getId(), hab.getId()))
+                .usuario(usuario)
+                .habilidad(hab)
+                .completado(false)
+                .build());
+
+        progresoEjercicioRepository.save(ProgresoEjercicio.builder()
+                .id(new ProgresoEjercicioKey(usuario.getId(), hab.getId(), ej.getId()))
+                .usuario(usuario)
+                .habilidad(hab)
+                .ejercicio(ej)
+                .completado(true)
+                .build());
+
+        // Primera llamada — completa la habilidad y suma la XP
         gamificacionService.procesarCompletitudHabilidad(usuario.getId(), hab.getId());
-        // Segunda llamada — no debe crear transacciones duplicadas
+        // Segunda llamada — no debe crear transacciones duplicadas (idempotente)
         gamificacionService.procesarCompletitudHabilidad(usuario.getId(), hab.getId());
 
         var txs = transaccionXpRepository.findByUsuarioIdOrderByFechaGananciaDesc(usuario.getId());

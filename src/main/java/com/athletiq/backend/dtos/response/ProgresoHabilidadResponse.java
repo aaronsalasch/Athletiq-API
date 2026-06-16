@@ -10,6 +10,7 @@ import java.util.UUID;
 @Builder
 public class ProgresoHabilidadResponse {
     private UUID idHabilidad;
+    private UUID idSeccion;
     private String nombreHabilidad;
     private Boolean completado;
     private LocalDateTime fechaCompletado;
