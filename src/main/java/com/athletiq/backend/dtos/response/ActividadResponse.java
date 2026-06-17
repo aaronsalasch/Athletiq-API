@@ -12,4 +12,5 @@ public class ActividadResponse {
     private String nombre;
     private String descripcion;
     private int totalSecciones;
+    private String urlImagen;
 }

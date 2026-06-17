@@ -19,4 +19,5 @@ public class HabilidadDetalleResponse {
     private Dificultad dificultad;
     private Integer tiempoEstimado;
     private List<EjercicioEnHabilidadResponse> ejercicios;
+    private String urlImagen;
 }

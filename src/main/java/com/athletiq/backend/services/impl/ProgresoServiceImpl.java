@@ -8,6 +8,7 @@ import com.athletiq.backend.models.entities.*;
 import com.athletiq.backend.models.keys.ProgresoEjercicioKey;
 import com.athletiq.backend.models.keys.ProgresoHabilidadKey;
 import com.athletiq.backend.repositories.*;
+import com.athletiq.backend.services.EventoComunidadService;
 import com.athletiq.backend.services.GamificacionService;
 import com.athletiq.backend.services.ProgresoService;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class ProgresoServiceImpl implements ProgresoService {
     private final ActividadRepository actividadRepository;
     private final SeccionRepository seccionRepository;
     private final GamificacionService gamificacionService;
+    private final EventoComunidadService eventoComunidadService;
 
     @Override
     public ProgresoResponse completarEjercicio(UUID usuarioId, UUID habilidadId, UUID ejercicioId) {
@@ -70,7 +72,7 @@ public class ProgresoServiceImpl implements ProgresoService {
 
         progreso.setCompletado(true);
         progreso.setFechaCompletado(LocalDateTime.now());
-        progresoEjercicioRepository.save(progreso);
+        progresoEjercicioRepository.saveAndFlush(progreso);
 
         inicializarProgresoHabilidadSiNecesario(usuarioId, habilidadId);
         procesarRacha(usuarioId);
@@ -95,10 +97,12 @@ public class ProgresoServiceImpl implements ProgresoService {
             if (!ph.getCompletado()) {
                 ph.setCompletado(true);
                 ph.setFechaCompletado(LocalDateTime.now());
-                progresoHabilidadRepository.save(ph);
+                progresoHabilidadRepository.saveAndFlush(ph);
                 
                 habilidadCompletada = true;
                 xpGanadaTotal += (totalEjercicios * 50);
+                
+                eventoComunidadService.publishHabilidadCompletada(usuarioId, habilidadId);
 
                 UUID seccionId = ph.getHabilidad().getSeccion().getId();
                 long totalHabilidades = habilidadRepository.countBySeccionId(seccionId);
@@ -107,6 +111,8 @@ public class ProgresoServiceImpl implements ProgresoService {
                 if (totalHabilidades > 0 && totalHabilidades == habilidadesCompletadas) {
                     seccionCompletada = true;
                     xpGanadaTotal += (totalHabilidades * 100);
+                    
+                    eventoComunidadService.publishSeccionCompletada(usuarioId, seccionId);
 
                     UUID actividadId = ph.getHabilidad().getSeccion().getActividad().getId();
                     long totalHabAct = habilidadRepository.countByActividadId(actividadId);
@@ -116,6 +122,8 @@ public class ProgresoServiceImpl implements ProgresoService {
                         actividadCompletada = true;
                         long totalSecciones = seccionRepository.countByActividadId(actividadId);
                         xpGanadaTotal += (totalSecciones * 200);
+                        
+                        eventoComunidadService.publishActividadCompletada(usuarioId, actividadId);
                     }
                 }
             }
@@ -226,12 +234,16 @@ public class ProgresoServiceImpl implements ProgresoService {
         long completados = progresoEjercicioRepository
                 .countByIdIdUsuarioAndIdIdHabilidadAndCompletadoTrue(usuarioId, habilidadId);
 
+        LocalDateTime fechaUltimo = progresoEjercicioRepository.findUltimaActividadPorHabilidad(usuarioId, habilidadId);
+
         return ProgresoHabilidadResponse.builder()
                 .idHabilidad(habilidadId)
                 .idSeccion(ph.getHabilidad().getSeccion().getId())
+                .idActividad(ph.getHabilidad().getSeccion().getActividad().getId())
                 .nombreHabilidad(ph.getHabilidad().getNombre())
                 .completado(ph.getCompletado())
                 .fechaCompletado(ph.getFechaCompletado())
+                .fechaUltimoEjercicio(fechaUltimo)
                 .totalEjercicios((int) total)
                 .ejerciciosCompletados((int) completados)
                 .build();

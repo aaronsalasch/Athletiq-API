@@ -5,6 +5,7 @@ import com.athletiq.backend.dtos.response.LigaResponse;
 import com.athletiq.backend.dtos.response.MiClasificacionResponse;
 import com.athletiq.backend.security.SecurityUtils;
 import com.athletiq.backend.services.ClasificacionService;
+import com.athletiq.backend.services.scheduled.LigaSchedulerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class ClasificacionController {
 
     private final ClasificacionService clasificacionService;
+    private final LigaSchedulerService ligaSchedulerService;
     private final SecurityUtils securityUtils;
 
     /**
@@ -69,5 +71,15 @@ public class ClasificacionController {
     public ResponseEntity<MiClasificacionResponse> getMiPosicion() {
         return ResponseEntity.ok(
                 clasificacionService.getMiPosicion(securityUtils.getCurrentUserId()));
+    }
+
+    /**
+     * POST /api/clasificacion/simular-fin-temporada
+     * Endpoint de desarrollo para simular manualmente el cierre de la temporada.
+     */
+    @PostMapping("/simular-fin-temporada")
+    public ResponseEntity<String> simularFinTemporada() {
+        ligaSchedulerService.procesarFinTemporada();
+        return ResponseEntity.ok("Simulación de fin de temporada completada con éxito. Ranking actualizado y ligas reasignadas.");
     }
 }

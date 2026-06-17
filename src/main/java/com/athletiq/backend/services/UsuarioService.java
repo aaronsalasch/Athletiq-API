@@ -11,4 +11,5 @@ public interface UsuarioService {
     UsuarioPerfilResponse getPerfil(UUID usuarioId);
     UsuarioPerfilResponse actualizarPerfil(UUID usuarioId, ActualizarPerfilRequest request);
     List<TransaccionXpResponse> getHistorialXp(UUID usuarioId);
+    UsuarioPerfilResponse subirAvatar(UUID usuarioId, org.springframework.web.multipart.MultipartFile file);
 }

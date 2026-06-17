@@ -32,6 +32,7 @@ public class ActividadServiceImpl implements ActividadService {
                         .nombre(a.getNombre())
                         .descripcion(a.getDescripcion())
                         .totalSecciones(seccionRepository.findByActividadIdOrderByOrden(a.getId()).size())
+                        .urlImagen(a.getImagenes().isEmpty() ? null : a.getImagenes().get(0).getUrlImagen())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -46,6 +47,7 @@ public class ActividadServiceImpl implements ActividadService {
                 .nombre(actividad.getNombre())
                 .descripcion(actividad.getDescripcion())
                 .totalSecciones(totalSecciones)
+                .urlImagen(actividad.getImagenes().isEmpty() ? null : actividad.getImagenes().get(0).getUrlImagen())
                 .build();
     }
 
@@ -76,6 +78,7 @@ public class ActividadServiceImpl implements ActividadService {
                         .dificultad(h.getDificultad())
                         .tiempoEstimado(h.getTiempoEstimado())
                         .totalEjercicios((int) habilidadEjercicioRepository.countByHabilidadId(h.getId()))
+                        .urlImagen(h.getImagenes().isEmpty() ? null : h.getImagenes().get(0).getUrlImagen())
                         .build())
                 .collect(Collectors.toList());
     }
@@ -101,6 +104,7 @@ public class ActividadServiceImpl implements ActividadService {
                 .dificultad(habilidad.getDificultad())
                 .tiempoEstimado(habilidad.getTiempoEstimado())
                 .ejercicios(ejercicios)
+                .urlImagen(habilidad.getImagenes().isEmpty() ? null : habilidad.getImagenes().get(0).getUrlImagen())
                 .build();
     }
 
@@ -127,6 +131,7 @@ public class ActividadServiceImpl implements ActividadService {
                 .repeticiones(he.getRepeticiones())
                 .xpOtorgada(he.getXpOtorgada())
                 .pasos(pasos)
+                .urlImagen(ejercicio.getImagenes().isEmpty() ? null : ejercicio.getImagenes().get(0).getUrlImagen())
                 .build();
     }
 }

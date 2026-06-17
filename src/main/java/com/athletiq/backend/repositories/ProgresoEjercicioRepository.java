@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,4 +18,7 @@ public interface ProgresoEjercicioRepository extends JpaRepository<ProgresoEjerc
 
     @Query("SELECT COUNT(pe) FROM ProgresoEjercicio pe JOIN pe.habilidad h JOIN h.seccion s WHERE pe.usuario.id = :usuarioId AND pe.completado = true AND s.actividad.id = :actividadId")
     long countCompletedByUsuarioAndActividadId(@Param("usuarioId") UUID usuarioId, @Param("actividadId") UUID actividadId);
+
+    @Query("SELECT MAX(pe.fechaCompletado) FROM ProgresoEjercicio pe WHERE pe.id.idUsuario = :usuarioId AND pe.id.idHabilidad = :habilidadId AND pe.completado = true")
+    LocalDateTime findUltimaActividadPorHabilidad(@Param("usuarioId") UUID usuarioId, @Param("habilidadId") UUID habilidadId);
 }

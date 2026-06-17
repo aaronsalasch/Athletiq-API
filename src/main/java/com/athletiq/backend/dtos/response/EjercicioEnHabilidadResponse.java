@@ -17,4 +17,5 @@ public class EjercicioEnHabilidadResponse {
     private Integer repeticiones;
     private Integer xpOtorgada;
     private List<PasoResponse> pasos;
+    private String urlImagen;
 }

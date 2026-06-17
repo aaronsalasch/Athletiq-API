@@ -62,6 +62,36 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), msg));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(
+            org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), "La imagen es demasiado grande. El límite de tamaño permitido es de 10 MB."));
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(org.springframework.dao.DataIntegrityViolationException ex) {
+        String msg = "Error de integridad de datos en el servidor";
+        String rootMsg = ex.getRootCause() != null ? ex.getRootCause().getMessage() : ex.getMessage();
+        if (rootMsg != null) {
+            if (rootMsg.contains("uk_seccion_actividad_orden") || rootMsg.contains("UK_SECCION_ACTIVIDAD_ORDEN")) {
+                msg = "Ya existe una sección con el número de orden indicado para esta actividad.";
+            } else if (rootMsg.contains("uk_habilidad_seccion_orden") || rootMsg.contains("UK_HABILIDAD_SECCION_ORDEN")) {
+                msg = "Ya existe una habilidad con el número de orden indicado para esta sección.";
+            } else if (rootMsg.contains("uk_habilidad_ejercicio_orden") || rootMsg.contains("UK_HABILIDAD_EJERCICIO_ORDEN")) {
+                msg = "Ya existe un ejercicio con el número de orden indicado para esta habilidad.";
+            } else if (rootMsg.contains("uk_habilidad_ejercicio") || rootMsg.contains("UK_HABILIDAD_EJERCICIO")) {
+                msg = "Este ejercicio ya está asociado a esta habilidad.";
+            } else if (rootMsg.contains("foreign key") || rootMsg.contains("FOREIGN KEY")) {
+                msg = "No se puede eliminar o modificar el elemento porque tiene otros registros relacionados.";
+            }
+        }
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(HttpStatus.CONFLICT.value(), msg));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
         log.error("Error inesperado", ex);
@@ -70,3 +100,4 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Error interno del servidor"));
     }
 }
+

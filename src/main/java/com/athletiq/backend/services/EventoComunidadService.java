@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface EventoComunidadService {
 
     void publishHabilidadCompletada(UUID usuarioId, UUID habilidadId);
+    void publishSeccionCompletada(UUID usuarioId, UUID seccionId);
+    void publishActividadCompletada(UUID usuarioId, UUID actividadId);
 
     void publishNivelAlcanzado(UUID usuarioId, int nivelNuevo);
 

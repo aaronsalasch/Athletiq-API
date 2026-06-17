@@ -49,6 +49,17 @@ public class UsuarioController {
     }
 
     /**
+     * POST /api/usuarios/me/avatar
+     * Sube un archivo de imagen como foto de perfil para el usuario en sesión.
+     */
+    @PostMapping("/me/avatar")
+    public ResponseEntity<UsuarioPerfilResponse> subirFotoPerfil(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(
+                usuarioService.subirAvatar(securityUtils.getCurrentUserId(), file));
+    }
+
+    /**
      * GET /api/usuarios/me/xp
      * Historial de transacciones de XP del usuario, ordenado por fecha DESC.
      */

@@ -56,6 +56,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/clasificacion").permitAll()
                 // Autenticación abierta
                 .requestMatchers("/api/auth/**").permitAll()
+                // Fotos de perfil subidas
+                .requestMatchers("/uploads/**").permitAll()
+                // Rutas de administración protegidas
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Todo lo demás requiere token
                 .anyRequest().authenticated()
             )

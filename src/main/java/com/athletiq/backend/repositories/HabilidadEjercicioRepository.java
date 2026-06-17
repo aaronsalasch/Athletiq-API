@@ -17,4 +17,7 @@ public interface HabilidadEjercicioRepository extends JpaRepository<HabilidadEje
 
     @Query("SELECT COUNT(he) FROM HabilidadEjercicio he JOIN he.habilidad h JOIN h.seccion s WHERE s.actividad.id = :actividadId")
     long countByActividadId(@Param("actividadId") UUID actividadId);
+
+    @Query("SELECT he.habilidad.seccion.actividad.nombre FROM HabilidadEjercicio he WHERE he.ejercicio.id = :ejercicioId")
+    List<String> findActividadNombresByEjercicioId(@Param("ejercicioId") UUID ejercicioId);
 }

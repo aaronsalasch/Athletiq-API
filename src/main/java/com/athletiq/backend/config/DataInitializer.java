@@ -44,6 +44,7 @@ public class DataInitializer {
     private final ClasificacionUsuarioRepository clasificacionUsuarioRepository;
     private final EventoComunidadRepository eventoComunidadRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ImagenRepository imagenRepository;
 
     @Bean
     @Transactional
@@ -53,6 +54,7 @@ public class DataInitializer {
             seedLigas();
             Temporada temporadaActiva = seedTemporadaInicial();
             seedDomainData(temporadaActiva);
+            seedImagesForExistingData();
         };
     }
 
@@ -499,6 +501,21 @@ public class DataInitializer {
         Habilidad planchaAbs = saveHabilidad(coreCal, 1, "Plancha Abdominal", "Estabilidad central y postura de core básica.", Dificultad.PRINCIPIANTE, 15);
         Habilidad lSit = saveHabilidad(coreCal, 2, "L-Sit en Paralelas", "Soporte escapular y flexión isométrica de cadera.", Dificultad.INTERMEDIO, 20);
         Habilidad frontLever = saveHabilidad(coreCal, 3, "Front Lever Pro", "Isometría de tracción horizontal y estabilidad abdominal.", Dificultad.AVANZADO, 30);
+        // Ejercicios Plancha Abdominal
+        Ejercicio planchaAntebrazos = saveEjercicio("Plancha de Antebrazos", "Estabilidad central isométrica sobre los antebrazos.");
+        seedPasos(planchaAntebrazos, List.of(
+            new PasoSeed(1, "Posición", "Apoya los antebrazos en el suelo, con los codos alineados justo debajo de los hombros."),
+            new PasoSeed(2, "Alineación", "Extiende las piernas apoyando las puntas de los pies, formando una línea recta desde la cabeza hasta los talones."),
+            new PasoSeed(3, "Activación", "Contrae abdomen y glúteos, empujando activamente el suelo para mantener las escápulas activas.")
+        ));
+        Ejercicio planchaAlta = saveEjercicio("Plancha Alta (High Plank)", "Soporte de plancha con los brazos extendidos.");
+        seedPasos(planchaAlta, List.of(
+            new PasoSeed(1, "Apoyo", "Coloca las manos en el suelo directamente debajo de los hombros, con los brazos completamente estirados."),
+            new PasoSeed(2, "Estabilidad", "Empuja los talones hacia atrás y activa cuadríceps, abdomen y glúteos."),
+            new PasoSeed(3, "Postura", "Mantén el cuello neutro y una línea recta en la columna sin arquear la zona lumbar.")
+        ));
+        seedHabilidadEjercicio(planchaAbs, planchaAntebrazos, 1, 3, 30, 15);
+        seedHabilidadEjercicio(planchaAbs, planchaAlta, 2, 3, 45, 20);
 
         // Ejercicios L-Sit
         Ejercicio rodillasColgado = saveEjercicio("Levantamiento de Rodillas Colgado", "Activación del core colgado de la barra.");
@@ -845,11 +862,30 @@ public class DataInitializer {
     }
 
     private void seedUsuariosYClasificaciones(Temporada temporada) {
+        Rol rolAdmin = rolRepository.findByNombre("ADMIN")
+                .orElseThrow(() -> new IllegalStateException("El rol ADMIN no existe en el sistema."));
         Rol rolUsuario = rolRepository.findByNombre("USUARIO")
                 .orElseThrow(() -> new IllegalStateException("El rol USUARIO no existe en el sistema."));
 
         Liga ligaBronce = ligaRepository.findByOrdenJerarquia(1)
                 .orElseThrow(() -> new IllegalStateException("La liga de jerarquía 1 (Bronce) no existe."));
+
+        // Registrar a admin@athletiq.app si no existe
+        if (!usuarioRepository.existsByCorreo("admin@athletiq.app")) {
+            Usuario admin = Usuario.builder()
+                    .nombre("Administrador")
+                    .correo("admin@athletiq.app")
+                    .password(passwordEncoder.encode("admin123"))
+                    .rol(rolAdmin)
+                    .nivel(10)
+                    .puntosXp(1500)
+                    .avatarUrl("https://api.dicebear.com/7.x/adventurer/svg?seed=admin")
+                    .colorHexLiga("#B9F2FF")
+                    .rachaActual(12)
+                    .build();
+            usuarioRepository.save(admin);
+            log.info("Usuario Administrador 'admin@athletiq.app' registrado con éxito.");
+        }
 
         // Registrar a alex@athletiq.app si no existe
         if (!usuarioRepository.existsByCorreo("alex@athletiq.app")) {
@@ -1049,6 +1085,240 @@ public class DataInitializer {
                 .temporada(temporada)
                 .xpAcumulada(xp)
                 .build());
+    }
+
+    private void seedImagesForExistingData() {
+        log.info("Iniciando sembrado de imágenes para datos existentes...");
+        
+        // 1. Actividades
+        List<Actividad> actividades = actividadRepository.findAll();
+        for (Actividad act : actividades) {
+            List<Imagen> imagenes = imagenRepository.findByActividadId(act.getId());
+            String url = getImageUrlForActividad(act.getNombre());
+            if (imagenes.isEmpty()) {
+                imagenRepository.save(Imagen.builder()
+                        .urlImagen(url)
+                        .nombreArchivo("actividad_" + act.getId() + ".jpg")
+                        .descripcion("Imagen de " + act.getNombre())
+                        .actividad(act)
+                        .build());
+            } else {
+                for (Imagen img : imagenes) {
+                    if (!img.getUrlImagen().equals(url)) {
+                        img.setUrlImagen(url);
+                        imagenRepository.save(img);
+                    }
+                }
+            }
+        }
+
+        // 2. Habilidades
+        List<Habilidad> habilidades = habilidadRepository.findAllWithSeccionAndActividad();
+        for (Habilidad hab : habilidades) {
+            List<Imagen> imagenes = imagenRepository.findByHabilidadId(hab.getId());
+            String actividadNombre = hab.getSeccion() != null && hab.getSeccion().getActividad() != null 
+                    ? hab.getSeccion().getActividad().getNombre() 
+                    : null;
+            String url = getImageUrlForHabilidadYActividad(hab.getNombre(), actividadNombre);
+            if (imagenes.isEmpty()) {
+                imagenRepository.save(Imagen.builder()
+                        .urlImagen(url)
+                        .nombreArchivo("habilidad_" + hab.getId() + ".jpg")
+                        .descripcion("Imagen de " + hab.getNombre())
+                        .habilidad(hab)
+                        .build());
+            } else {
+                for (Imagen img : imagenes) {
+                    if (!img.getUrlImagen().equals(url)) {
+                        img.setUrlImagen(url);
+                        imagenRepository.save(img);
+                    }
+                }
+            }
+        }
+
+        // 3. Ejercicios
+        List<Ejercicio> ejercicios = ejercicioRepository.findAll();
+        for (Ejercicio ej : ejercicios) {
+            List<Imagen> imagenes = imagenRepository.findByEjercicioId(ej.getId());
+            List<String> actNombres = habilidadEjercicioRepository.findActividadNombresByEjercicioId(ej.getId());
+            String actividadNombre = actNombres.isEmpty() ? null : actNombres.get(0);
+            String url = getImageUrlForHabilidadYActividad(ej.getNombre(), actividadNombre);
+            if (imagenes.isEmpty()) {
+                imagenRepository.save(Imagen.builder()
+                        .urlImagen(url)
+                        .nombreArchivo("ejercicio_" + ej.getId() + ".jpg")
+                        .descripcion("Imagen de " + ej.getNombre())
+                        .ejercicio(ej)
+                        .build());
+            } else {
+                for (Imagen img : imagenes) {
+                    if (!img.getUrlImagen().equals(url)) {
+                        img.setUrlImagen(url);
+                        imagenRepository.save(img);
+                    }
+                }
+            }
+        }
+        log.info("Imágenes sembradas correctamente.");
+    }
+
+    private String getImageUrlForActividad(String name) {
+        String n = name.toLowerCase();
+        if (n.contains("patinaje")) {
+            return "/patinaje_basico.png";
+        } else if (n.contains("natacion") || n.contains("natación")) {
+            return "/natacion_crol.png";
+        } else if (n.contains("running")) {
+            return "/running_resistencia.png";
+        } else if (n.contains("calistenia")) {
+            return "/calistenia_core.png";
+        } else if (n.contains("yoga")) {
+            return "/yoga_balance.png";
+        } else if (n.contains("gimnasia")) {
+            return "/calistenia_handstand.png";
+        } else if (n.contains("halterofilia")) {
+            return "/calistenia_piernas.png";
+        }
+        return "/habilidad_ejercicio_placeholder.jpg";
+    }
+
+    private String getImageUrlForHabilidadYActividad(String name, String actividadNombre) {
+        if (actividadNombre == null) {
+            return getImageUrlForHabilidad(name);
+        }
+        
+        String act = actividadNombre.toLowerCase();
+        String n = name.toLowerCase();
+        
+        if (act.contains("patinaje")) {
+            if (n.contains("freno") || n.contains("detención") || n.contains("detener") || n.contains("t-stop") || n.contains("taco")) {
+                return "/patinaje_freno.png";
+            }
+            if (n.contains("postura") || n.contains("seguridad") || n.contains("ready")) {
+                return "/patinaje_postura.png";
+            }
+            return "/patinaje_basico.png";
+        }
+        
+        if (act.contains("natacion") || act.contains("natación")) {
+            if (n.contains("pecho") || n.contains("rana") || n.contains("coordinación")) {
+                return "/natacion_pecho.png";
+            }
+            return "/natacion_crol.png";
+        }
+        
+        if (act.contains("running")) {
+            if (n.contains("aeróbica") || n.contains("resistencia") || n.contains("fartlek") || n.contains("intervalo") || n.contains("zona 2") || n.contains("zona2")) {
+                return "/running_resistencia.png";
+            }
+            return "/running_tecnica.png";
+        }
+        
+        if (act.contains("calistenia")) {
+            if (n.contains("flexión") || n.contains("pushup") || n.contains("push-up") || n.contains("inclinada") || n.contains("regular") || n.contains("pica") || n.contains("hspu")) {
+                return "/calistenia_flexion.png";
+            }
+            if (n.contains("fondo") || n.contains("dips")) {
+                return "/calistenia_fondo.png";
+            }
+            if (n.contains("handstand") || n.contains("parada de manos") || n.contains("vertical")) {
+                return "/calistenia_handstand.png";
+            }
+            if (n.contains("muscle-up") || n.contains("muscleup") || n.contains("explosiva") || n.contains("transición")) {
+                return "/calistenia_muscleup.png";
+            }
+            if (n.contains("remo") || n.contains("dominada") || n.contains("pullup") || n.contains("escapular") || n.contains("tracción")) {
+                return "/calistenia_dominada.png";
+            }
+            if (n.contains("sentadilla") || n.contains("squat") || n.contains("pistol") || n.contains("búlgara") || n.contains("piernas") || n.contains("tren inferior")) {
+                return "/calistenia_piernas.png";
+            }
+            return "/calistenia_core.png";
+        }
+        
+        if (act.contains("yoga")) {
+            if (n.contains("cadera") || n.contains("apertura") || n.contains("split") || n.contains("paloma") || n.contains("mariposa") || n.contains("baddha") || n.contains("kapotasana") || n.contains("hanumanasana")) {
+                return "/yoga_cadera.png";
+            }
+            if (n.contains("arco") || n.contains("rueda") || n.contains("columna") || n.contains("cobra") || n.contains("espalda") || n.contains("dhanurasana") || n.contains("chakrasana") || n.contains("bhujangasana")) {
+                return "/yoga_espalda.png";
+            }
+            return "/yoga_balance.png";
+        }
+        
+        if (act.contains("gimnasia")) {
+            if (n.contains("handstand") || n.contains("parada de manos") || n.contains("vertical") || n.contains("caminata") || n.contains("wall") || n.contains("kick-up")) {
+                return "/calistenia_handstand.png";
+            }
+            if (n.contains("fondo")) {
+                return "/calistenia_fondo.png";
+            }
+            return "/calistenia_core.png";
+        }
+        
+        if (act.contains("halterofilia")) {
+            if (n.contains("sentadilla") || n.contains("squat") || n.contains("frontal")) {
+                return "/calistenia_piernas.png";
+            }
+            return "/calistenia_piernas.png";
+        }
+        
+        return getImageUrlForHabilidad(name);
+    }
+
+    private String getImageUrlForHabilidad(String name) {
+        String n = name.toLowerCase();
+        if (n.contains("apertura") || n.contains("flexibilidad de cadera") || n.contains("split") || n.contains("paloma") || n.contains("mariposa")) {
+            return "/yoga_cadera.png";
+        } else if (n.contains("cuervo") || n.contains("bakasana") || n.contains("balance en antebrazos") || n.contains("pincha")) {
+            return "/yoga_balance.png";
+        } else if (n.contains("arco") || n.contains("rueda") || n.contains("chakrasana") || n.contains("cobra") || n.contains("columna") || n.contains("dhanurasana")) {
+            return "/yoga_espalda.png";
+        } else if (n.contains("postura de seguridad")) {
+            return "/patinaje_postura.png";
+        } else if (n.contains("limón") || n.contains("swizzle")) {
+            return "/patinaje_basico.png";
+        } else if (n.contains("zancada básica") || n.contains("basic stride")) {
+            return "/patinaje_basico.png";
+        } else if (n.contains("desplazamiento") || n.contains("crossover") || n.contains("cruces") || n.contains("zancada")) {
+            return "/patinaje_basico.png";
+        } else if (n.contains("freno de taco")) {
+            return "/patinaje_freno.png";
+        } else if (n.contains("freno en t") || n.contains("t-stop")) {
+            return "/patinaje_freno.png";
+        } else if (n.contains("freno") || n.contains("giro") || n.contains("tijera") || n.contains("detención") || n.contains("dirección")) {
+            return "/patinaje_freno.png";
+        } else if (n.contains("crol") || n.contains("propulsión") || n.contains("pecho") || n.contains("rana") || n.contains("natación") || n.contains("acuático")) {
+            return "/natacion_crol.png";
+        } else if (n.contains("viraje") || n.contains("campana") || n.contains("salida") || n.contains("flip")) {
+            return "/natacion_pecho.png";
+        } else if (n.contains("postura y cadencia") || n.contains("zancada y apoyo") || n.contains("skipping") || n.contains("ppm") || n.contains("metatarso")) {
+            return "/running_tecnica.png";
+        } else if (n.contains("aeróbica") || n.contains("fartlek") || n.contains("intervalo") || n.contains("resistencia") || n.contains("zona 2")) {
+            return "/running_resistencia.png";
+        } else if (n.contains("flexión") || n.contains("pushup") || n.contains("pica")) {
+            if (n.contains("parada") || n.contains("hspu") || n.contains("vertical")) {
+                return "/calistenia_handstand.png";
+            }
+            return "/calistenia_flexion.png";
+        } else if (n.contains("fondo") || n.contains("dips")) {
+            return "/calistenia_fondo.png";
+        } else if (n.contains("handstand") || n.contains("parada de manos") || n.contains("vertical")) {
+            return "/calistenia_handstand.png";
+        } else if (n.contains("remo") || n.contains("dominada") || n.contains("pullup") || n.contains("escapular") || n.contains("tracción")) {
+            if (n.contains("muscle")) {
+                return "/calistenia_muscleup.png";
+            }
+            return "/calistenia_dominada.png";
+        } else if (n.contains("muscle-up") || n.contains("explosiva") || n.contains("transición")) {
+            return "/calistenia_muscleup.png";
+        } else if (n.contains("plancha") || n.contains("l-sit") || n.contains("lever") || n.contains("tuck") || n.contains("core") || n.contains("soporte") || n.contains("rodillas colgado")) {
+            return "/calistenia_core.png";
+        } else if (n.contains("sentadilla") || n.contains("squat") || n.contains("pistol") || n.contains("búlgara") || n.contains("piernas") || n.contains("tren inferior")) {
+            return "/calistenia_piernas.png";
+        }
+        return "/habilidad_ejercicio_placeholder.jpg";
     }
 
     // ── Registro interno ─────────────────────────────────────────────────────

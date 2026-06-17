@@ -71,6 +71,47 @@ public class UsuarioServiceImpl implements UsuarioService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public UsuarioPerfilResponse subirAvatar(UUID usuarioId, org.springframework.web.multipart.MultipartFile file) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", usuarioId));
+
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("El archivo está vacío");
+        }
+
+        try {
+            java.io.File uploadDir = new java.io.File("./uploads");
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs();
+            }
+
+            String originalFilename = file.getOriginalFilename();
+            String extension = ".jpg";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            String fileName = UUID.randomUUID().toString() + extension;
+
+            java.nio.file.Path path = java.nio.file.Paths.get("./uploads/" + fileName);
+            java.nio.file.Files.write(path, file.getBytes());
+
+            String fileUrl = org.springframework.web.servlet.support.ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/uploads/")
+                    .path(fileName)
+                    .toUriString();
+
+            usuario.setAvatarUrl(fileUrl);
+            usuarioRepository.save(usuario);
+
+            long completadas = progresoHabilidadRepository.countByUsuarioIdAndCompletadoTrue(usuarioId);
+            return toPerfilResponse(usuario, completadas);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Error al guardar la foto de perfil", e);
+        }
+    }
+
     // ── mapper ────────────────────────────────────────────────────────────────
 
     private UsuarioPerfilResponse toPerfilResponse(Usuario usuario, long habilidadesCompletadas) {

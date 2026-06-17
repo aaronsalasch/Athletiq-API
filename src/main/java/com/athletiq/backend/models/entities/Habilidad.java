@@ -4,6 +4,8 @@ import com.athletiq.backend.models.enums.Dificultad;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Entity
@@ -45,4 +47,10 @@ public class Habilidad {
 
     // tiempo estimado en minutos
     private Integer tiempoEstimado;
+
+    @OneToMany(mappedBy = "habilidad", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Imagen> imagenes = new ArrayList<>();
 }

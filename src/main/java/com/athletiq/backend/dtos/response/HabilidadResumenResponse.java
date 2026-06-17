@@ -16,4 +16,5 @@ public class HabilidadResumenResponse {
     private Dificultad dificultad;
     private Integer tiempoEstimado;
     private int totalEjercicios;
+    private String urlImagen;
 }
