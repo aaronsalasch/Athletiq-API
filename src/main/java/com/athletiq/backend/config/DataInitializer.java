@@ -1102,13 +1102,6 @@ public class DataInitializer {
                         .descripcion("Imagen de " + act.getNombre())
                         .actividad(act)
                         .build());
-            } else {
-                for (Imagen img : imagenes) {
-                    if (!img.getUrlImagen().equals(url)) {
-                        img.setUrlImagen(url);
-                        imagenRepository.save(img);
-                    }
-                }
             }
         }
 
@@ -1127,13 +1120,6 @@ public class DataInitializer {
                         .descripcion("Imagen de " + hab.getNombre())
                         .habilidad(hab)
                         .build());
-            } else {
-                for (Imagen img : imagenes) {
-                    if (!img.getUrlImagen().equals(url)) {
-                        img.setUrlImagen(url);
-                        imagenRepository.save(img);
-                    }
-                }
             }
         }
 
@@ -1151,13 +1137,6 @@ public class DataInitializer {
                         .descripcion("Imagen de " + ej.getNombre())
                         .ejercicio(ej)
                         .build());
-            } else {
-                for (Imagen img : imagenes) {
-                    if (!img.getUrlImagen().equals(url)) {
-                        img.setUrlImagen(url);
-                        imagenRepository.save(img);
-                    }
-                }
             }
         }
         log.info("Imágenes sembradas correctamente.");
