@@ -1,8 +1,11 @@
 package com.athletiq.backend.services.impl;
 
 import com.athletiq.backend.dtos.request.ActualizarPerfilRequest;
+import com.athletiq.backend.dtos.response.ActividadResponse;
+import com.athletiq.backend.dtos.response.EventoComunidadResponse;
 import com.athletiq.backend.dtos.response.TransaccionXpResponse;
 import com.athletiq.backend.dtos.response.UsuarioPerfilResponse;
+import com.athletiq.backend.dtos.response.UsuarioPublicoResponse;
 import com.athletiq.backend.exceptions.ResourceNotFoundException;
 import com.athletiq.backend.models.entities.Usuario;
 import com.athletiq.backend.repositories.ProgresoHabilidadRepository;
@@ -10,6 +13,7 @@ import com.athletiq.backend.repositories.TransaccionXpRepository;
 import com.athletiq.backend.repositories.UsuarioRepository;
 import com.athletiq.backend.services.UsuarioService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +28,11 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final ProgresoHabilidadRepository progresoHabilidadRepository;
     private final TransaccionXpRepository transaccionXpRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final com.athletiq.backend.repositories.SeguidorRepository seguidorRepository;
+    private final com.athletiq.backend.repositories.ActividadRepository actividadRepository;
+    private final com.athletiq.backend.repositories.SeccionRepository seccionRepository;
+    private final com.athletiq.backend.services.EventoComunidadService eventoComunidadService;
 
     @Override
     @Transactional(readOnly = true)
@@ -48,6 +57,9 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
         if (request.getAvatarUrl() != null) {
             usuario.setAvatarUrl(request.getAvatarUrl());
+        }
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            usuario.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
         usuarioRepository.save(usuario);
@@ -110,6 +122,86 @@ public class UsuarioServiceImpl implements UsuarioService {
         } catch (java.io.IOException e) {
             throw new RuntimeException("Error al guardar la foto de perfil", e);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UsuarioPublicoResponse getPerfilPublico(UUID currentUserId, UUID targetUserId) {
+        Usuario usuario = usuarioRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", targetUserId));
+
+        long completadas = progresoHabilidadRepository.countByUsuarioIdAndCompletadoTrue(targetUserId);
+
+        boolean siguiendo = false;
+        if (currentUserId != null && !currentUserId.equals(targetUserId)) {
+            siguiendo = seguidorRepository.existsById(new com.athletiq.backend.models.keys.SeguidorKey(currentUserId, targetUserId));
+        }
+
+        long seguidores = seguidorRepository.countByIdIdSeguido(targetUserId);
+        long seguidos = seguidorRepository.countByIdIdSeguidor(targetUserId);
+
+        List<ActividadResponse> favs = usuario.getActividadesFavoritas().stream()
+                .map(a -> ActividadResponse.builder()
+                        .id(a.getId())
+                        .nombre(a.getNombre())
+                        .descripcion(a.getDescripcion())
+                        .totalSecciones(seccionRepository.findByActividadIdOrderByOrden(a.getId()).size())
+                        .urlImagen(a.getImagenes().isEmpty() ? null : a.getImagenes().get(0).getUrlImagen())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<EventoComunidadResponse> eventos = eventoComunidadService.getEventosUsuario(targetUserId);
+
+        return UsuarioPublicoResponse.builder()
+                .id(usuario.getId())
+                .nombre(usuario.getNombre())
+                .avatarUrl(usuario.getAvatarUrl())
+                .nivel(usuario.getNivel())
+                .puntosXp(usuario.getPuntosXp())
+                .rachaActual(usuario.getRachaActual())
+                .colorHexLiga(usuario.getColorHexLiga())
+                .habilidadesCompletadas(completadas)
+                .siguiendo(siguiendo)
+                .seguidoresCount(seguidores)
+                .seguidosCount(seguidos)
+                .actividadesFavoritas(favs)
+                .eventos(eventos)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public List<ActividadResponse> toggleLikeActividad(UUID usuarioId, UUID actividadId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", usuarioId));
+        com.athletiq.backend.models.entities.Actividad actividad = actividadRepository.findById(actividadId)
+                .orElseThrow(() -> new ResourceNotFoundException("Actividad", actividadId));
+
+        if (usuario.getActividadesFavoritas().contains(actividad)) {
+            usuario.getActividadesFavoritas().remove(actividad);
+        } else {
+            usuario.getActividadesFavoritas().add(actividad);
+        }
+        usuarioRepository.save(usuario);
+
+        return getActividadesFavoritas(usuarioId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActividadResponse> getActividadesFavoritas(UUID usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario", usuarioId));
+
+        return usuario.getActividadesFavoritas().stream()
+                .map(a -> ActividadResponse.builder()
+                        .id(a.getId())
+                        .nombre(a.getNombre())
+                        .descripcion(a.getDescripcion())
+                        .totalSecciones(seccionRepository.findByActividadIdOrderByOrden(a.getId()).size())
+                        .urlImagen(a.getImagenes().isEmpty() ? null : a.getImagenes().get(0).getUrlImagen())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     // ── mapper ────────────────────────────────────────────────────────────────

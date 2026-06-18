@@ -12,4 +12,7 @@ public class ActualizarPerfilRequest {
     // URL del avatar (validación básica de longitud)
     @Size(max = 500, message = "La URL del avatar no puede superar los 500 caracteres")
     private String avatarUrl;
+
+    @Size(min = 6, max = 100, message = "La contraseña debe tener entre 6 y 100 caracteres")
+    private String password;
 }

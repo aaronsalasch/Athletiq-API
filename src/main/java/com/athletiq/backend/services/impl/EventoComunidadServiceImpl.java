@@ -107,6 +107,26 @@ public class EventoComunidadServiceImpl implements EventoComunidadService {
                 .map(this::toResponse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<EventoComunidadResponse> getFeedSeguidos(UUID usuarioId) {
+        return eventoComunidadRepository
+                .findFeedBySeguidos(usuarioId)
+                .stream()
+                .map(this::toResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.List<EventoComunidadResponse> getEventosUsuario(UUID usuarioId) {
+        return eventoComunidadRepository
+                .findByUsuarioIdOrderByFechaCreacionDesc(usuarioId)
+                .stream()
+                .map(this::toResponse)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private void guardarEvento(UUID usuarioId, TipoEvento tipo, UUID referenciaId) {

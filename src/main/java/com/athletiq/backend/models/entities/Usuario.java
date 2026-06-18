@@ -57,6 +57,17 @@ public class Usuario {
 
     private LocalDate fechaUltimaAct;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "usuario_actividades_favoritas",
+        joinColumns = @JoinColumn(name = "id_usuario"),
+        inverseJoinColumns = @JoinColumn(name = "id_actividad")
+    )
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private java.util.List<Actividad> actividadesFavoritas = new java.util.ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         this.fechaRegistro = LocalDateTime.now();

@@ -17,4 +17,8 @@ public interface EventoComunidadService {
     void publishLigaAscenso(UUID usuarioId, UUID ligaId);
 
     Page<EventoComunidadResponse> getEventosComunidad(Pageable pageable);
+
+    java.util.List<EventoComunidadResponse> getFeedSeguidos(java.util.UUID usuarioId);
+
+    java.util.List<EventoComunidadResponse> getEventosUsuario(java.util.UUID usuarioId);
 }

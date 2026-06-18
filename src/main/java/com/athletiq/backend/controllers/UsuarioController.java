@@ -1,8 +1,10 @@
 package com.athletiq.backend.controllers;
 
 import com.athletiq.backend.dtos.request.ActualizarPerfilRequest;
+import com.athletiq.backend.dtos.response.ActividadResponse;
 import com.athletiq.backend.dtos.response.TransaccionXpResponse;
 import com.athletiq.backend.dtos.response.UsuarioPerfilResponse;
+import com.athletiq.backend.dtos.response.UsuarioPublicoResponse;
 import com.athletiq.backend.security.SecurityUtils;
 import com.athletiq.backend.services.UsuarioService;
 import jakarta.validation.Valid;
@@ -11,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Gestión del perfil del usuario autenticado.
@@ -66,5 +69,23 @@ public class UsuarioController {
     @GetMapping("/me/xp")
     public ResponseEntity<List<TransaccionXpResponse>> getMiHistorialXp() {
         return ResponseEntity.ok(usuarioService.getHistorialXp(securityUtils.getCurrentUserId()));
+    }
+
+    @GetMapping("/{id}/perfil")
+    public ResponseEntity<UsuarioPublicoResponse> getPerfilPublico(@PathVariable("id") UUID targetUserId) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(usuarioService.getPerfilPublico(currentUserId, targetUserId));
+    }
+
+    @PostMapping("/me/actividades/{actividadId}/like")
+    public ResponseEntity<List<ActividadResponse>> toggleLikeActividad(@PathVariable("actividadId") UUID actividadId) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(usuarioService.toggleLikeActividad(currentUserId, actividadId));
+    }
+
+    @GetMapping("/me/actividades/favoritas")
+    public ResponseEntity<List<ActividadResponse>> getActividadesFavoritas() {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        return ResponseEntity.ok(usuarioService.getActividadesFavoritas(currentUserId));
     }
 }

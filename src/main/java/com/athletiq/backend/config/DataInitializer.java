@@ -888,10 +888,10 @@ public class DataInitializer {
         }
 
         // Registrar a alex@athletiq.app si no existe
-        if (!usuarioRepository.existsByCorreo("alex@athletiq.app")) {
+        if (!usuarioRepository.existsByCorreo("aaron@athletiq.app")) {
             Usuario alex = Usuario.builder()
-                    .nombre("Alex")
-                    .correo("alex@athletiq.app")
+                    .nombre("Aarón")
+                    .correo("aaron@athletiq.app")
                     .password(passwordEncoder.encode("password123"))
                     .rol(rolUsuario)
                     .nivel(3)
