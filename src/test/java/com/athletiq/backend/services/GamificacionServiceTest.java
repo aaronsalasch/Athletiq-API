@@ -14,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,8 @@ class GamificacionServiceTest {
     @Autowired TemporadaRepository temporadaRepository;
     @Autowired ProgresoHabilidadRepository progresoHabilidadRepository;
     @Autowired ProgresoEjercicioRepository progresoEjercicioRepository;
+
+    @MockBean EventoComunidadService eventoComunidadService;
 
     private Usuario usuario;
 
@@ -117,6 +120,68 @@ class GamificacionServiceTest {
 
             ClasificacionUsuario cu = clasificacionUsuarioRepository.findById(key).orElseThrow();
             assertThat(cu.getXpAcumulada()).isEqualTo(200);
+        });
+    }
+
+    @Test
+    @DisplayName("actualizarClasificacion → recalcula ligas dinámicamente y promociona al usuario")
+    void actualizarClasificacion_recomputesLeaguesAndPromotes() {
+        temporadaRepository.findByActivaTrue().ifPresent(temporada -> {
+            // Limpiar clasificaciones de esta temporada para el test
+            clasificacionUsuarioRepository.deleteAll();
+            clasificacionUsuarioRepository.flush();
+
+            java.util.List<Liga> ligas = ligaRepository.findAllByOrderByOrdenJerarquiaAsc();
+            Liga bronce = ligas.get(0);
+
+            // Crear 3 usuarios adicionales con 0 XP (todos en Bronce)
+            Usuario u1 = usuarioRepository.save(Usuario.builder()
+                    .nombre("User1")
+                    .correo("u1_" + System.nanoTime() + "@test.com")
+                    .password("pwd")
+                    .rol(usuario.getRol())
+                    .build());
+            Usuario u2 = usuarioRepository.save(Usuario.builder()
+                    .nombre("User2")
+                    .correo("u2_" + System.nanoTime() + "@test.com")
+                    .password("pwd")
+                    .rol(usuario.getRol())
+                    .build());
+            Usuario u3 = usuarioRepository.save(Usuario.builder()
+                    .nombre("User3")
+                    .correo("u3_" + System.nanoTime() + "@test.com")
+                    .password("pwd")
+                    .rol(usuario.getRol())
+                    .build());
+
+            clasificacionUsuarioRepository.save(ClasificacionUsuario.builder()
+                    .id(new ClasificacionUsuarioKey(usuario.getId(), bronce.getId(), temporada.getId()))
+                    .usuario(usuario).liga(bronce).temporada(temporada).xpAcumulada(0).build());
+            clasificacionUsuarioRepository.save(ClasificacionUsuario.builder()
+                    .id(new ClasificacionUsuarioKey(u1.getId(), bronce.getId(), temporada.getId()))
+                    .usuario(u1).liga(bronce).temporada(temporada).xpAcumulada(0).build());
+            clasificacionUsuarioRepository.save(ClasificacionUsuario.builder()
+                    .id(new ClasificacionUsuarioKey(u2.getId(), bronce.getId(), temporada.getId()))
+                    .usuario(u2).liga(bronce).temporada(temporada).xpAcumulada(0).build());
+            clasificacionUsuarioRepository.save(ClasificacionUsuario.builder()
+                    .id(new ClasificacionUsuarioKey(u3.getId(), bronce.getId(), temporada.getId()))
+                    .usuario(u3).liga(bronce).temporada(temporada).xpAcumulada(0).build());
+
+            // En este punto, todos tienen 0 XP y están en Bronce.
+            // Ahora, 'usuario' gana 500 XP.
+            gamificacionService.actualizarClasificacion(usuario.getId(), 500);
+
+            // Dado que el usuario ahora tiene 500 XP y los otros 3 tienen 0 XP, el usuario está en el top de la clasificación.
+            // Con 4 usuarios, su posición es 0 (percentil = 1.0), por lo que debe haber subido de liga.
+            ClasificacionUsuario cu = clasificacionUsuarioRepository
+                    .findByUsuarioIdAndTemporadaId(usuario.getId(), temporada.getId())
+                    .orElseThrow();
+
+            assertThat(cu.getLiga().getOrdenJerarquia()).isGreaterThan(bronce.getOrdenJerarquia());
+
+            // Su colorHexLiga en el perfil del usuario también debe haberse actualizado al de la nueva liga
+            Usuario userActualizado = usuarioRepository.findById(usuario.getId()).orElseThrow();
+            assertThat(userActualizado.getColorHexLiga()).isEqualTo(cu.getLiga().getColorHex());
         });
     }
 

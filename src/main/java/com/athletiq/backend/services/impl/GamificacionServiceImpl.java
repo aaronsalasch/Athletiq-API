@@ -2,6 +2,7 @@ package com.athletiq.backend.services.impl;
 
 import com.athletiq.backend.exceptions.ResourceNotFoundException;
 import com.athletiq.backend.models.entities.*;
+import com.athletiq.backend.models.keys.ClasificacionUsuarioKey;
 import com.athletiq.backend.models.keys.ProgresoHabilidadKey;
 import com.athletiq.backend.repositories.*;
 import com.athletiq.backend.services.EventoComunidadService;
@@ -33,6 +34,7 @@ public class GamificacionServiceImpl implements GamificacionService {
     private final TransaccionXpRepository transaccionXpRepository;
     private final ClasificacionUsuarioRepository clasificacionUsuarioRepository;
     private final TemporadaRepository temporadaRepository;
+    private final LigaRepository ligaRepository;
     private final EventoComunidadService eventoComunidadService;
 
     @Override
@@ -108,14 +110,91 @@ public class GamificacionServiceImpl implements GamificacionService {
 
     @Override
     public void actualizarClasificacion(UUID usuarioId, int xpGanada) {
-        temporadaRepository.findByActivaTrue().ifPresent(temporada ->
-            clasificacionUsuarioRepository
+        temporadaRepository.findByActivaTrue().ifPresent(temporada -> {
+            ClasificacionUsuario clasificacion = clasificacionUsuarioRepository
                     .findByUsuarioIdAndTemporadaId(usuarioId, temporada.getId())
-                    .ifPresent(clasificacion -> {
-                        clasificacion.setXpAcumulada(clasificacion.getXpAcumulada() + xpGanada);
-                        clasificacionUsuarioRepository.save(clasificacion);
-                    })
-        );
+                    .orElseGet(() -> {
+                        Usuario usuario = usuarioRepository.findById(usuarioId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Usuario", usuarioId));
+                        Liga ligaBronce = ligaRepository.findByOrdenJerarquia(1)
+                                .orElseThrow(() -> new ResourceNotFoundException("Liga Bronce"));
+
+                        ClasificacionUsuarioKey key = new ClasificacionUsuarioKey(usuarioId, ligaBronce.getId(), temporada.getId());
+
+                        ClasificacionUsuario nuevaClasif = ClasificacionUsuario.builder()
+                                .id(key)
+                                .usuario(usuario)
+                                .liga(ligaBronce)
+                                .temporada(temporada)
+                                .xpAcumulada(0)
+                                .build();
+                        return clasificacionUsuarioRepository.save(nuevaClasif);
+                    });
+
+            clasificacion.setXpAcumulada(clasificacion.getXpAcumulada() + xpGanada);
+            clasificacionUsuarioRepository.save(clasificacion);
+
+            // Recalcular ligas dinámicamente para todos los usuarios en la temporada activa
+            recalcularLigasTemporada(temporada.getId());
+        });
+    }
+
+    private void recalcularLigasTemporada(UUID temporadaId) {
+        java.util.List<ClasificacionUsuario> ranking = clasificacionUsuarioRepository
+                .findByTemporadaIdOrderByXpAcumuladaDesc(temporadaId);
+        java.util.List<Liga> ligas = ligaRepository.findAllByOrderByOrdenJerarquiaAsc();
+
+        if (ranking.isEmpty() || ligas.isEmpty()) {
+            return;
+        }
+
+        int total = ranking.size();
+        int numLigas = ligas.size();
+        Liga ligaBronce = ligas.get(0); // liga de menor jerarquía (Bronce)
+
+        for (int i = 0; i < total; i++) {
+            ClasificacionUsuario clasificacion = ranking.get(i);
+            Liga nuevaLiga;
+
+            if (clasificacion.getXpAcumulada() <= 0) {
+                nuevaLiga = ligaBronce;
+            } else {
+                // Calcular percentil
+                double percentil = 1.0 - ((double) i / total);
+                int ligaIdx = Math.min((int) (percentil * numLigas), numLigas - 1);
+                nuevaLiga = ligas.get(ligaIdx);
+            }
+
+            Liga ligaAnterior = clasificacion.getLiga();
+            if (!nuevaLiga.getId().equals(ligaAnterior.getId())) {
+                // Eliminar clasificación vieja debido al cambio de id_liga en la PK compuesta
+                clasificacionUsuarioRepository.delete(clasificacion);
+                clasificacionUsuarioRepository.flush();
+
+                ClasificacionUsuarioKey newKey = new ClasificacionUsuarioKey(
+                        clasificacion.getUsuario().getId(), nuevaLiga.getId(), temporadaId);
+
+                ClasificacionUsuario nuevaClasif = ClasificacionUsuario.builder()
+                        .id(newKey)
+                        .usuario(clasificacion.getUsuario())
+                        .liga(nuevaLiga)
+                        .temporada(clasificacion.getTemporada())
+                        .xpAcumulada(clasificacion.getXpAcumulada())
+                        .build();
+
+                clasificacionUsuarioRepository.save(nuevaClasif);
+
+                // Actualizar color de la liga en el perfil del usuario
+                Usuario usuario = clasificacion.getUsuario();
+                usuario.setColorHexLiga(nuevaLiga.getColorHex());
+                usuarioRepository.save(usuario);
+
+                // Publicar ascenso si corresponde
+                if (nuevaLiga.getOrdenJerarquia() > ligaAnterior.getOrdenJerarquia()) {
+                    eventoComunidadService.publishLigaAscenso(usuario.getId(), nuevaLiga.getId());
+                }
+            }
+        }
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.athletiq.backend.services.scheduled;
 
 import com.athletiq.backend.models.entities.*;
+import com.athletiq.backend.models.keys.ClasificacionUsuarioKey;
 import com.athletiq.backend.repositories.*;
 import com.athletiq.backend.services.EventoComunidadService;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +116,28 @@ public class LigaSchedulerService {
                 .activa(true)
                 .build();
         temporadaRepository.save(nueva);
-        log.info("Nueva temporada creada, inicio: {}", nueva.getFechaInicio());
+
+        Liga ligaBronce = ligaRepository.findByOrdenJerarquia(1)
+                .orElseThrow(() -> new IllegalStateException("La liga Bronce no existe."));
+
+        List<Usuario> todosUsuarios = usuarioRepository.findAll();
+        for (Usuario u : todosUsuarios) {
+            // Reiniciar colorHexLiga al color de Bronce
+            u.setColorHexLiga(ligaBronce.getColorHex());
+            usuarioRepository.save(u);
+
+            // Crear registro inicial de ClasificacionUsuario para la nueva temporada en Bronce con 0 XP
+            ClasificacionUsuarioKey key = new ClasificacionUsuarioKey(u.getId(), ligaBronce.getId(), nueva.getId());
+            ClasificacionUsuario clasificacion = ClasificacionUsuario.builder()
+                    .id(key)
+                    .usuario(u)
+                    .liga(ligaBronce)
+                    .temporada(nueva)
+                    .xpAcumulada(0)
+                    .build();
+            clasificacionUsuarioRepository.save(clasificacion);
+        }
+
+        log.info("Nueva temporada creada, inicio: {}. Se crearon clasificaciones iniciales en Bronce para {} usuarios.", nueva.getFechaInicio(), todosUsuarios.size());
     }
 }

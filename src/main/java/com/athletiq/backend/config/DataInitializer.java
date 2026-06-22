@@ -43,6 +43,7 @@ public class DataInitializer {
     private final UsuarioRepository usuarioRepository;
     private final ClasificacionUsuarioRepository clasificacionUsuarioRepository;
     private final EventoComunidadRepository eventoComunidadRepository;
+    private final TransaccionXpRepository transaccionXpRepository;
     private final PasswordEncoder passwordEncoder;
     private final ImagenRepository imagenRepository;
 
@@ -55,6 +56,7 @@ public class DataInitializer {
             Temporada temporadaActiva = seedTemporadaInicial();
             seedDomainData(temporadaActiva);
             seedImagesForExistingData();
+            seedXpHistory();
         };
     }
 
@@ -270,7 +272,7 @@ public class DataInitializer {
         seedHabilidadEjercicio(virajesSalidas, flipTurn, 1, 3, 8, 30);
 
         // --- PECHO ---
-        Habilidad pechoCoord = saveHabilidad(breaststrokeNat, 1, "Coordinación de Pecho", "Coordinación del ciclo de brazada, patada y planeo.", Dificultad.INTERMEDIO, 20);
+        Habilidad pechoCoord = saveHabilidad(breaststrokeNat, 1, "Coordinación de Pecho", "Coordinación del ciclo de brazada, patada y planeo.", Dificultad.PRINCIPIANTE, 20);
 
         // Ejercicios Pecho
         Ejercicio patadaRana = saveEjercicio("Patada de Rana (Breaststroke Kick)", "Patada simétrica de propulsión circular.");
@@ -329,7 +331,7 @@ public class DataInitializer {
 
         // --- RESISTENCIA ---
         Habilidad zonaAerobica = saveHabilidad(resistRunning, 1, "Zona Aeróbica 2", "Entrenamiento de baja intensidad para resistencia base.", Dificultad.PRINCIPIANTE, 30);
-        Habilidad intervalosFartlek = saveHabilidad(resistRunning, 2, "Intervalos y Fartlek", "Desarrollo de velocidad y VO2 máx.", Dificultad.AVANZADO, 25);
+        Habilidad intervalosFartlek = saveHabilidad(resistRunning, 2, "Intervalos y Fartlek", "Desarrollo de velocidad y VO2 máx.", Dificultad.INTERMEDIO, 25);
 
         // Ejercicios Resistencia
         Ejercicio zona2Run = saveEjercicio("Carrera de Zona 2", "Correr a un ritmo conversacional manteniendo pulso bajo.");
@@ -753,8 +755,8 @@ public class DataInitializer {
         Seccion cleanJerkHalt = saveSeccion(halterofilia, 2, "Envión (Clean & Jerk)", "Levantamiento en dos tiempos: cargada al pecho y empuje vertical.");
 
         // --- SNATCH ---
-        Habilidad powerSnatch = saveHabilidad(snatchHalt, 1, "Arranque de Fuerza / Power Snatch", "Levantamiento de barra sin flexión profunda de rodillas.", Dificultad.INTERMEDIO, 20);
-        Habilidad squatSnatch = saveHabilidad(snatchHalt, 2, "Arranque Olímpico / Squat Snatch", "Movimiento oficial con caída profunda debajo de la barra.", Dificultad.AVANZADO, 35);
+        Habilidad powerSnatch = saveHabilidad(snatchHalt, 1, "Arranque de Fuerza / Power Snatch", "Levantamiento de barra sin flexión profunda de rodillas.", Dificultad.PRINCIPIANTE, 20);
+        Habilidad squatSnatch = saveHabilidad(snatchHalt, 2, "Arranque Olímpico / Squat Snatch", "Movimiento oficial con caída profunda debajo de la barra.", Dificultad.INTERMEDIO, 35);
 
         // Ejercicios Power Snatch
         Ejercicio snatchPull = saveEjercicio("Jalón Alto de Arranque (Snatch High Pull)", "Tracción explosiva para aprender la extensión triple.");
@@ -788,7 +790,7 @@ public class DataInitializer {
         seedHabilidadEjercicio(squatSnatch, squatSnatchEj, 2, 4, 2, 60);
 
         // --- CLEAN & JERK ---
-        Habilidad powerClean = saveHabilidad(cleanJerkHalt, 1, "Cargada de Fuerza / Power Clean", "Levantamiento de la barra al pecho sin sentadilla profunda.", Dificultad.INTERMEDIO, 20);
+        Habilidad powerClean = saveHabilidad(cleanJerkHalt, 1, "Cargada de Fuerza / Power Clean", "Levantamiento de la barra al pecho sin sentadilla profunda.", Dificultad.PRINCIPIANTE, 20);
         Habilidad jerkProg = saveHabilidad(cleanJerkHalt, 2, "Envión / Split Jerk", "Empuje vertical y tijera para fijar la barra arriba.", Dificultad.INTERMEDIO, 25);
 
         // Ejercicios Power Clean
@@ -1087,6 +1089,30 @@ public class DataInitializer {
                 .build());
     }
 
+    private void seedXpHistory() {
+        log.info("Verificando historial de XP para gráficas...");
+        List<String> correos = List.of("aaron@athletiq.app", "admin@athletiq.app");
+        for (String correo : correos) {
+            usuarioRepository.findByCorreo(correo).ifPresent(usuario -> {
+                long txCount = transaccionXpRepository.countByUsuarioId(usuario.getId());
+                if (txCount < 7) {
+                    for (int i = 6; i >= 0; i--) {
+                        int xp = (int) (Math.random() * 50) + 20;
+                        transaccionXpRepository.save(TransaccionXp.builder()
+                                .usuario(usuario)
+                                .cantidadXp(xp)
+                                .fechaGanancia(LocalDateTime.now().minusDays(i))
+                                .build());
+                    }
+                    usuario.setRachaActual(7);
+                    usuario.setFechaUltimaAct(LocalDate.now());
+                    usuarioRepository.save(usuario);
+                    log.info("Historial de XP sembrado para {}", correo);
+                }
+            });
+        }
+    }
+
     private void seedImagesForExistingData() {
         log.info("Iniciando sembrado de imágenes para datos existentes...");
         
@@ -1306,3 +1332,4 @@ public class DataInitializer {
     private record PasoSeed(int orden, String nombre, String instruccion) {}
     private record MockUserSeed(String nombre, String correo, String password, int nivel, int xp, String avatarUrl, int racha, String ligaNombre) {}
 }
+

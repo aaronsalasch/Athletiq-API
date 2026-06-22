@@ -38,6 +38,8 @@ public class TransaccionXp {
 
     @PrePersist
     protected void onCreate() {
-        this.fechaGanancia = LocalDateTime.now();
+        if (this.fechaGanancia == null) {
+            this.fechaGanancia = LocalDateTime.now();
+        }
     }
 }

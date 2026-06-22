@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface TransaccionXpRepository extends JpaRepository<TransaccionXp, UUID> {
     List<TransaccionXp> findByUsuarioIdOrderByFechaGananciaDesc(UUID usuarioId);
+    long countByUsuarioId(UUID usuarioId);
 }
